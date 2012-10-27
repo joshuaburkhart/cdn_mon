@@ -22,20 +22,20 @@ class DataRow
 
     def to_s
         return\
-        "#{@local_node_name},"\
-        "#{@local_ip_addr},"\
-        "#{@local_mac_addr},"\
-        "#{@local_geoip_info},"\
-        \
-        "#{@remote_node_name},"\
-        "#{@remote_ip_addr},"\
-        "#{@remote_mac_addr},"\
-        "#{@remote_geoip_info},"\
-        \
-        "#{@timestamp},"\
-        "#{@bandwidth},"\
-        "#{@rtt},"\
-        "#{@uri}"
+            "#{@local_node_name},"\
+            "#{@local_ip_addr},"\
+            "#{@local_mac_addr},"\
+            "#{@local_geoip_info},"\
+            \
+            "#{@remote_node_name},"\
+            "#{@remote_ip_addr},"\
+            "#{@remote_mac_addr},"\
+            "#{@remote_geoip_info},"\
+            \
+            "#{@timestamp},"\
+            "#{@bandwidth},"\
+            "#{@rtt},"\
+            "#{@uri}"
     end
 end
 
@@ -75,6 +75,18 @@ def findRemoteIp(resource)
     return ip.strip
 end
 
+def measurePingRtt(resource)
+    hostname = findRemoteHostname(resource)
+    ping_out = %x(ping -c1 #{hostname})
+    ping_out.match(/time=(\w+.?\w+) ms/)
+    rtt = $1
+    if(!rtt.nil?)
+        return rtt.strip
+    else
+        raise "UNKNOWN RTT INDICATOR:\n#{ping_out}"
+    end
+end
+
 def measureWgetBdwth(resource)
     tera = 1000000000
     giga = 1000000
@@ -93,9 +105,8 @@ def measureWgetBdwth(resource)
         ret = "#{Float($1) * kilo}"
     else
         raise "UNKOWN BANDWIDTH INDICATOR:\n#{wget_out}"
-        exit
     end
-    return "#{ret} KB/s"
+    return ret #in KB/s
 end
 
 if(ARGV.length != 2)
@@ -106,8 +117,8 @@ end
 request_count = Integer(ARGV[0])
 uri_filename = ARGV[1]
 
-UNSET="<empty>"
-ERROR="<unavailable>"
+UNSET="<unavailable>"
+ERROR="<error>"
 
 table = Array.new
 out_file_handle = File.open("resource_bdwdth_output.log",'a')
@@ -138,7 +149,12 @@ while true
                 puts "Exception Raised: #{$!}"
                 row.bandwidth = ERROR
             end
-            row.rtt = UNSET
+            begin
+                row.rtt = measurePingRtt(uri)
+            rescue
+                puts "Exception Raised: #{$!}"
+                row.rtt = ERROR
+            end
             row.uri = uri.strip
             table << row
         }
