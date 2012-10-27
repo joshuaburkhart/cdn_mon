@@ -1,7 +1,6 @@
 #!/usr/local/bin/ruby
 
-#Usage: ruby resource_bdwdth_tester.rb <# of times to request each resource> <URI>
-#TODO: change <URI> above to a filename containing a list of URI's
+#Usage: ruby resource_bdwdth_tester.rb <# of times to request each resource> <URI filename>
 
 #Example:
 
@@ -44,7 +43,7 @@ def measureWgetBdwth(resource)
     giga = 1000000
     mega = 1000
     kilo = 1 
-    wget_out = %x(wget #{resource} 2>&1)
+    wget_out = %x(wget #{resource} 2>/dev/null)
     wget_out.match(/\((\d+.?\d* [A-Z]B\/s)\)/)
     speed = $1
     if(speed.match(/(\d+.?\d*) TB\/s/))
@@ -63,45 +62,51 @@ def measureWgetBdwth(resource)
 end
 
 if(ARGV.length != 2)
-    puts "THIS SCRIPT REQUIRES TWO ARGUMENTS\n#Usage: ruby resource_bdwdth_tester.rb <# of times to request each resource> <URI>"
+    puts "THIS SCRIPT REQUIRES TWO ARGUMENTS\n#Usage: ruby resource_bdwdth_tester.rb <# of times to request each resource> <URI filename>"
     exit
 end
 
 request_count = Integer(ARGV[0])
-uri = ARGV[1]
+uri_filename = ARGV[1]
+
 UNSET="empty"
 ERROR="unavailable"
 
 table = Array.new
+uri_file_handle = File.open(uri_filename,'r')
 
 print "working..."
-request_count.times {
-    print "."
-    STDOUT.flush
-    row = DataRow.new
+while (uri = uri_file_handle.gets) 
+    request_count.times {
+        print "."
+        STDOUT.flush
+        row = DataRow.new
 
-    row.local_node_name = UNSET
-    row.local_ip_addr = UNSET
-    row.local_mac_addr = UNSET
-    row.local_geoip_info = UNSET
+        row.local_node_name = UNSET
+        row.local_ip_addr = UNSET
+        row.local_mac_addr = UNSET
+        row.local_geoip_info = UNSET
 
-    row.remote_node_name = UNSET
-    row.remote_ip_addr = UNSET
-    row.remote_mac_addr = UNSET
-    row.remote_geoip_info = UNSET
+        row.remote_node_name = UNSET
+        row.remote_ip_addr = UNSET
+        row.remote_mac_addr = UNSET
+        row.remote_geoip_info = UNSET
 
-    row.timestamp = UNSET
-    begin
-        row.bandwidth = measureWgetBdwth(uri)
-    rescue
-        puts "Exception Raised: #{$!}"
-        row.bandwidth = ERROR
-    end
-    row.rtt = UNSET
-    row.uri = UNSET
-    table << row
-}
+        row.timestamp = UNSET
+        begin
+            row.bandwidth = measureWgetBdwth(uri)
+        rescue
+            puts "Exception Raised: #{$!}"
+            row.bandwidth = ERROR
+        end
+        row.rtt = UNSET
+        row.uri = UNSET
+        table << row
+    }
+end
+uri_file_handle.close
 puts
 table.each { |row|
     row.to_s
 }
+puts "done."
