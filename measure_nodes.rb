@@ -1,8 +1,8 @@
 #!/usr/local/bin/ruby
 
-#Usage: ruby resource_bdwdth_tester.rb <# of times to request each resource> <URI filename>
+#Usage: ruby measure_nodes.rb <# of times to request each resource> <URI filename>
 
-#Example: ruby resource_bdwdth_tester.rb 2 test_uri.txt
+#Example: ruby measure_nodes.rb 2 test_uri.txt
 
 class DataRow
     attr_accessor :local_node_name
@@ -121,50 +121,47 @@ UNSET="<unavailable>"
 ERROR="<error>"
 
 table = Array.new
-out_file_handle = File.open("resource_bdwdth_output.log",'a')
+out_file_handle = File.open("node_measurements.csv",'a')
 
 print "working..."
-while true
-    uri_file_handle = File.open(uri_filename,'r')
-    while (uri = uri_file_handle.gets) 
-        request_count.times {
-            print "."
-            STDOUT.flush
-            row = DataRow.new
+uri_file_handle = File.open(uri_filename,'r')
+while (uri = uri_file_handle.gets) 
+    request_count.times {
+        print "."
+        STDOUT.flush
+        row = DataRow.new
 
-            row.local_node_name = findLocalHostname()
-            row.local_ip_addr = findLocalIp()
-            row.local_mac_addr = findLocalMac()
-            row.local_geoip_info = UNSET
+        row.local_node_name = findLocalHostname()
+        row.local_ip_addr = findLocalIp()
+        row.local_mac_addr = findLocalMac()
+        row.local_geoip_info = UNSET
 
-            row.remote_node_name = findRemoteHostname(uri)
-            row.remote_ip_addr = findRemoteIp(uri)
-            row.remote_mac_addr = UNSET
-            row.remote_geoip_info = UNSET
+        row.remote_node_name = findRemoteHostname(uri)
+        row.remote_ip_addr = findRemoteIp(uri)
+        row.remote_mac_addr = UNSET
+        row.remote_geoip_info = UNSET
 
-            row.timestamp = Time.now
-            begin
-                row.bandwidth = measureWgetBdwth(uri)
-            rescue
-                puts "Exception Raised: #{$!}"
-                row.bandwidth = ERROR
-            end
-            begin
-                row.rtt = measurePingRtt(uri)
-            rescue
-                puts "Exception Raised: #{$!}"
-                row.rtt = ERROR
-            end
-            row.uri = uri.strip
-            table << row
-        }
-    end
-    puts
-    table.each { |row|
-        out_file_handle.puts row.to_s
+        row.timestamp = Time.now
+        begin
+            row.bandwidth = measureWgetBdwth(uri)
+        rescue
+            puts "\nException Raised: #{$!}"
+            row.bandwidth = ERROR
+        end
+        begin
+            row.rtt = measurePingRtt(uri)
+        rescue
+            puts "\nException Raised: #{$!}"
+            row.rtt = ERROR
+        end
+        row.uri = uri.strip
+        table << row
     }
-    uri_file_handle.close
-    sleep 1
 end
+puts
+table.each { |row|
+    out_file_handle.puts row.to_s
+}
+uri_file_handle.close
 out_file_handle.close
 puts "done."
