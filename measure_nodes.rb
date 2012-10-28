@@ -93,7 +93,7 @@ def sendAltSrcSyns(alt_src_count,uri,alt_src_type)
         alt_src_ip = nil
     end
     if(alt_src_count > 0 && !alt_src_ip.nil?)
-        %(sudo hping3 -S -a #{alt_src_ip} #{hostname} -c #{alt_src_count})
+        %x(sudo hping3 -S -a #{alt_src_ip} #{hostname} -c #{alt_src_count})
     end
 end
 
