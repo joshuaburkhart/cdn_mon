@@ -1,7 +1,10 @@
 #!/usr/local/bin/ruby
 
-h = <<-EOS
-Usage: ruby measure_nodes.rb <alternate src count> <alternate src type (ingress|egress|none)> <uri request count> </path/to/uri/list/file>
+require 'optparse'
+options = {}
+optparse = OptionParser.new { |opts|
+	opts.banner = <<-EOS
+Usage: ruby measure_nodes.rb <alternate src count> <alternate src type [ingress | egress]> <uri request count> </path/to/uri/list/file>
 
 Example 1: ruby measure_nodes.rb 1 e 2 test_uri.txt
 Example 2: ruby measure_nodes.rb 0 n 2 test_uri.txt
@@ -11,6 +14,30 @@ local_node_name,local_ip_addr,local_mac_addr,local_geoip_info,remote_node_name,r
 
 Note: This program requires the hping3 tool (http://www.hping.org/) be installed and runnable by the user in order to use the alternate source ip feature.
 EOS
+	opts.on('-h','--help','Display this screen') {
+		puts opts
+		exit
+	}
+	options[:alt_src_count] = 0
+	opts.on('-a','--alt_count N','Alternate Source Count N') { |n|
+		options[:alt_src_count] = Integer(n)
+	}
+	options[:alt_src_type] = :none
+	opts.on('-t','--type T',[:i,:ingress,:e,:egress],'Alternate Source Type T') { |t|
+		options[:alt_src_type] = t
+	}
+	options[:uri_req_count] = 1
+	opts.on('-r','--req_count C','URI Request Count C') { |c|
+		options[:uri_req_count] = Integer(c)
+	}
+	options[:uri_file_path] = nil
+		opts.on('-f','--file FILE','URI File Path FILE') { |file|
+		options[:uri_file_path] = file
+	}
+}
+
+optparse.parse!
+raise OptionParser::MissingArgument,"URI File Path = #{options[:uri_file_path]}" if options[:uri_file_path].nil?
 
 class DataRow
     attr_accessor :local_node_name
@@ -139,16 +166,10 @@ def measurePingRtt(uri)
     end
 end
 
-if(ARGV.length != 4)
-    puts "INCORRECT ARGUMENT COUNT"
-    puts h
-    exit
-end
-
-syn_count = Integer(ARGV[0])
-alt_src_type = ARGV[1].to_s[0,1]
-request_count = Integer(ARGV[2])
-uri_filename = ARGV[3]
+syn_count = options[:alt_src_count]
+alt_src_type = options[:alt_src_type]
+request_count = options[:uri_req_count]
+uri_filename = options[:uri_file_path]
 
 puts "Using alternate source #{syn_count} times prior to each bandwidth measurement..."
 puts "Alternate source test type #{alt_src_type}..."
