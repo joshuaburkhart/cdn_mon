@@ -1,11 +1,15 @@
 #!/usr/local/bin/ruby
 
 h = <<-EOS
-#Usage: ruby measure_nodes.rb <alternate src count> <alternate src type (ingress / egress)> <uri request count> </path/to/uri/list/file>
+Usage: ruby measure_nodes.rb <alternate src count> <alternate src type (ingress|egress|none)> <uri request count> </path/to/uri/list/file>
 
-#Example: ruby measure_nodes.rb 0 e 2 test_uri.txt
+Example 1: ruby measure_nodes.rb 1 e 2 test_uri.txt
+Example 2: ruby measure_nodes.rb 0 n 2 test_uri.txt
 
-#Note: This program requires the hping3 tool (http://www.hping.org/) be installed and runnable by the user in order to use the alternate source ip feature.
+Output Format:
+local_node_name,local_ip_addr,local_mac_addr,local_geoip_info,remote_node_name,remote_ip_addr,remote_mac_addr,remote_geoip_info,timestamp,alt_src_type,syn_count,bandwidth,rtt,uri
+
+Note: This program requires the hping3 tool (http://www.hping.org/) be installed and runnable by the user in order to use the alternate source ip feature.
 EOS
 
 class DataRow
@@ -20,6 +24,8 @@ class DataRow
     attr_accessor :remote_geoip_info
 
     attr_accessor :timestamp
+    attr_accessor :alt_src_type
+    attr_accessor :syn_count
     attr_accessor :bandwidth
     attr_accessor :rtt
     attr_accessor :uri
@@ -37,6 +43,8 @@ class DataRow
             "#{@remote_geoip_info},"\
             \
             "#{@timestamp},"\
+            "#{@alt_src_type},"\
+            "#{@syn_count},"\
             "#{@bandwidth},"\
             "#{@rtt},"\
             "#{@uri}"
@@ -79,7 +87,7 @@ def findRemoteIp(uri)
     return ip.strip
 end
 
-def sendAltSrcSyns(alt_src_count,uri,alt_src_type)
+def sendAltSrcSyns(syn_count,uri,alt_src_type)
     alt_src_ip = nil
     hostname = findRemoteHostname(uri)
     ip = findRemoteIp(uri)
@@ -92,8 +100,8 @@ def sendAltSrcSyns(alt_src_count,uri,alt_src_type)
     else
         alt_src_ip = nil
     end
-    if(alt_src_count > 0 && !alt_src_ip.nil?)
-        %x(sudo hping3 -S -a #{alt_src_ip} #{hostname} -c #{alt_src_count})
+    if(!alt_src_ip.nil? && syn_count > 0)
+        %x(sudo hping3 -S -a #{alt_src_ip} #{hostname} -c #{syn_count})
     end
 end
 
@@ -132,17 +140,17 @@ def measurePingRtt(uri)
 end
 
 if(ARGV.length != 4)
-    puts "THIS SCRIPT REQUIRES 4 ARGUMENTS"
+    puts "INCORRECT ARGUMENT COUNT"
     puts h
     exit
 end
 
-alt_src_count = Integer(ARGV[0])
+syn_count = Integer(ARGV[0])
 alt_src_type = ARGV[1].to_s[0,1]
 request_count = Integer(ARGV[2])
 uri_filename = ARGV[3]
 
-puts "Using alternate source #{alt_src_count} times prior to each bandwidth measurement..."
+puts "Using alternate source #{syn_count} times prior to each bandwidth measurement..."
 puts "Alternate source test type #{alt_src_type}..."
 puts "Requesting each URI #{request_count} time(s)..."
 puts "Accessing URI's listed in #{uri_filename}..."
@@ -173,7 +181,9 @@ while (uri = uri_file_handle.gets)
         row.remote_geoip_info = UNSET
 
         row.timestamp = Time.now
-        sendAltSrcSyns(alt_src_count,uri,alt_src_type)
+        row.alt_src_type = alt_src_type
+        row.syn_count = syn_count
+        sendAltSrcSyns(syn_count,uri,alt_src_type)
         begin
             row.bandwidth = measureWgetBdwth(uri)
         rescue
