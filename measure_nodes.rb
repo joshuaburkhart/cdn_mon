@@ -4,7 +4,7 @@ require 'optparse'
 options = {}
 optparse = OptionParser.new { |opts|
 	opts.banner = <<-EOS
-Usage: ruby measure_nodes.rb <alternate src count> <alternate src type [ingress | egress]> <uri request count> </path/to/uri/list/file>
+Usage: ruby measure_nodes.rb [-a alternate src count]  [-t ingress | egress] -r uri request count -f /path/to/uri/list/file
 
 Example 1: ruby measure_nodes.rb 1 e 2 test_uri.txt
 Example 2: ruby measure_nodes.rb 0 n 2 test_uri.txt
@@ -23,7 +23,7 @@ EOS
 		options[:alt_src_count] = Integer(n)
 	}
 	options[:alt_src_type] = :none
-	opts.on('-t','--type T',[:i,:ingress,:e,:egress],'Alternate Source Type T') { |t|
+	opts.on('-t','--type T',[:ingress,:egress],'Alternate Source Type T') { |t|
 		options[:alt_src_type] = t
 	}
 	options[:uri_req_count] = 1
@@ -37,7 +37,11 @@ EOS
 }
 
 optparse.parse!
-raise OptionParser::MissingArgument,"URI File Path = #{options[:uri_file_path]}" if options[:uri_file_path].nil?
+if (options[:uri_file_path].nil?)
+    raise OptionParser::MissingArgument,"URI File Path = #{options[:uri_file_path]}"
+elsif (options[:alt_src_type] == :none && options[:alt_src_count] > 0)
+    raise OptionParser::MissingArgument,"Alternate Source Count = #{options[:alt_src_count]} but Alternate Source Type = #{options[:alt_src_type]}"
+end
 
 class DataRow
     attr_accessor :local_node_name
@@ -119,10 +123,10 @@ def sendAltSrcSyns(syn_count,uri,alt_src_type)
     hostname = findRemoteHostname(uri)
     ip = findRemoteIp(uri)
     ip_ary = ip.split(/\./)
-    if(alt_src_type == "i")
+    if(alt_src_type == :egress)
         #assume CIDR block with 24 bit prefix (a.b.c.d/24)
         alt_src_ip = "#{ip_ary[0]}.#{ip_ary[1]}.#{ip_ary[2]}.#{rand(255)}"
-    elsif(alt_src_type == "e")
+    elsif(alt_src_type == :ingress)
         alt_src_ip = "#{rand(ip_ary[0])}.#{rand(255)}.#{rand(255)}.#{rand(255)}"
     else
         alt_src_ip = nil
