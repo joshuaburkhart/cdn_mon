@@ -100,7 +100,7 @@ def findLocalMac()
 end
 
 def findRemoteHostname(uri)
-    uri.strip.match(/http:\/\/([a-zA-Z0-9.]+[a-z0-9])(\/|$)/)
+    uri.strip.match(/http:\/\/([a-zA-Z0-9.-]+[a-z0-9])(\/|$)/)
     fqdn = $1
     if(fqdn.nil?) #assume uri is an ip address...
         host_out = %x(host #{uri.strip})
