@@ -6,8 +6,8 @@ optparse = OptionParser.new { |opts|
 	opts.banner = <<-EOS
 Usage: ruby measure_nodes.rb [-a alternate src count]  [-t ingress | egress] -r uri request count -f /path/to/uri/list/file
 
-Example 1: ruby measure_nodes.rb 1 e 2 test_uri.txt
-Example 2: ruby measure_nodes.rb 0 n 2 test_uri.txt
+Example 1: ruby measure_nodes.rb -a 1 -t egress -r 2 -f test_uri.txt
+Example 2: ruby measure_nodes.rb -r 2 -f test_uri.txt
 
 Output Format:
 local_node_name,local_ip_addr,local_mac_addr,local_geoip_info,remote_node_name,remote_ip_addr,remote_mac_addr,remote_geoip_info,timestamp,alt_src_type,syn_count,bandwidth,rtt,uri
@@ -100,12 +100,16 @@ def findLocalMac()
 end
 
 def findRemoteHostname(uri)
-    uri.strip.match(/http:\/\/([a-z0-9.]+[a-z0-9])\//)
+    uri.strip.match(/http:\/\/([a-zA-Z0-9.]+[a-z0-9])(\/|$)/)
     fqdn = $1
     if(fqdn.nil?) #assume uri is an ip address...
         host_out = %x(host #{uri.strip})
         host_out.match(/pointer (.*$)/)
         fqdn = $1
+        if(fqdn.nil?)
+            puts "COULD NOT FIND FQDN FOR URI '#{uri.strip}':"
+            puts "#{host_out}"
+        end
     end
     return fqdn.strip
 end
@@ -137,6 +141,9 @@ def sendAltSrcSyns(syn_count,uri,alt_src_type)
 end
 
 def measureWgetBdwth(uri)
+    puts "MEASURING BANDWIDTH WITH WGET..."
+    puts "URI: #{uri}"
+    puts "URI.strip: #{uri.strip}"
     tera = 1000000000
     giga = 1000000
     mega = 1000
@@ -195,16 +202,19 @@ while (uri = uri_file_handle.gets)
         STDOUT.flush
         row = DataRow.new
 
+        puts "FILLING CLIENT VALS..."
         row.local_node_name = findLocalHostname()
         row.local_ip_addr = findLocalIp()
         row.local_mac_addr = findLocalMac()
         row.local_geoip_info = UNSET
 
+        puts "FILLING SERVER VALS..."
         row.remote_node_name = findRemoteHostname(uri)
         row.remote_ip_addr = findRemoteIp(uri)
         row.remote_mac_addr = UNSET
         row.remote_geoip_info = UNSET
 
+        puts "FILLING URI VALS..."
         row.timestamp = Time.now
         row.alt_src_type = alt_src_type
         row.syn_count = syn_count
@@ -221,11 +231,14 @@ while (uri = uri_file_handle.gets)
             puts "\nException Raised: #{$!}"
             row.rtt = ERROR
         end
+        
+        puts "CREATING DATA ROW..."
         row.uri = uri.strip
         table << row
     }
 end
 puts
+puts "WRITING #{table.size} ROWS TO CSV..."
 table.each { |row|
     out_file_handle.puts row.to_s
 }
