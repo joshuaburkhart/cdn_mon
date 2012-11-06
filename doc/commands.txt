@@ -1,0 +1,2 @@
+cat ../crawler/testFile-1.txt | tr ' ' '\n' | grep -Po '(?<=^).+(?=\.\.\.\.)' > espn_sample_uri_list.txt
+cat testFile-1.txt | grep -Po '(?<=Crawling).+(?=\.\.\.\.)'
