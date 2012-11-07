@@ -1,4 +1,6 @@
 *.swp
+*.swo
 *.csv
 *.log
+.DS_Store
 tmp
