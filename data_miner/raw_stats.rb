@@ -5,10 +5,10 @@ require 'optparse'
 options = {}
 optparse = OptionParser.new { |opts|
     opts.banner = <<-EOS
-Usage: ruby raw_stats.rb -f /path/to/data/file/1 /path/to/data/file/2 /path/to/data/file/3 [-o /path/to/out/file]
+Usage: ruby raw_stats.rb -f /cleaned/csv/1 [/cleaned/csv/2 ...] [-o /out/csv]
 
-Example 1: ruby raw_stats.rb -f ../test/out.csv
-Example 2: ruby raw_stats.rb -f ../test/out.csv ../test2/out.csv -o ../test/out.geoip.csv
+Example 1: ruby raw_stats.rb -f ../test/out.geoip.csv
+Example 2: ruby raw_stats.rb -f ../test/out.geoip.csv ../test2/out.geoip.csv -o ../test/average_rtts.csv
 
 Output Format:
 uri,RTT avg 1,RTT avg 2,RTT avg N
@@ -18,8 +18,8 @@ uri,RTT avg 1,RTT avg 2,RTT avg N
         exit
     }
     options[:data_files] = nil
-    opts.on('-f','--files FILE1,FILE2,FILEN',Array,'Data File Paths - List CSVs') { |files|
-        options[:data_files] = files
+    opts.on('-l','--list a,b,c',Array,"Data File Paths - 'list' CSVs") { |l|
+        options[:data_files] = l
     }
     options[:out_file_path] = "#{options[:data_files]}.stats.csv"
     opts.on('-o','--out FILE','Output File Path FILE') { |file|
@@ -35,13 +35,21 @@ end
 def writeBufferVals(file_handle,uri,buffers)
     file_handle.print "#{uri}"
     buffers.each { |buf|
-        avg = buf.inject{ |sum,e| sum + e}.to_f / buf.size
-        file_handle.print ",#{avg}"
+        if(!buf.include?(ERROR))
+            sum = 0.0
+            buf.each { |e|
+                sum += Float(e)
+            }
+            avg = (sum / buf.size)
+            file_handle.print ",#{avg}"
+        else
+            file_handle.print ",#{ERROR}"
+        end
     }
     file_handle.puts
 end
 
-puts "Reading from '#{options[:data_files]}'..."
+puts "Reading from '#{options[:data_files].inspect}'..."
 puts "Outputting to '#{options[:out_file_path]}'..."
 puts
 
@@ -55,7 +63,7 @@ data_files = options[:data_files]
 
 data_files.each do |i|
     puts "making handle from #{i}..."
-    out_file_handle.print "#{i}\t"
+    out_file_handle.print "#{i},"
     data_handles << File.new(i)
     node_buffers << Array.new
 end
@@ -66,41 +74,40 @@ print "working..."
 REF_POS = 0
 RTT_POS = 12
 URI_POS = 13
-cached_ref_uri = nil
+CLB = "CACHE_LINE_BOOTSTRAP"
+cached_ref_uri = CLB
 while ref_line = data_handles[REF_POS].gets
     print "."
     STDOUT.flush
     matched_uri = UNSET
-    #validate uri
     ref_line.split(',')[URI_POS].match(/(^http:\/\/[a-zA-Z0-9\.\-]+[a-z0-9][\/]*[a-zA-Z0-9\-\_\.\~\/]*|^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)/)
-    puts "ref line: #{ref_line}"
-    puts "ref line matched uri: #{$1}"
-    puts "cached_ref_uri is #{cached_ref_uri}"
-    if(cached_ref_uri == nil)
-        cached_ref_uri = $1
+    ref_match = $1
+    if(cached_ref_uri == CLB)
+        cached_ref_uri = ref_match
     end
-    if(cached_ref_uri == $1)
-        node_buffers[REF_POS] << ref_line.split(',')[RTT_POS]
-        (1..data_handles.length - 1).each { |i|
-            #while cpd_line = data_handles[i].gets && valid(cpd_line)
-            cpd_line.split(',')[URI_POS].match(/(^http:\/\/[a-zA-Z0-9\.\-]+[a-z0-9][\/]*[a-zA-Z0-9\-\_\.\~\/]*|^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)/)
-            if(cached_ref_uri == $1)
-                node_buffers[i] << cpd_line.split(',')[RTT_POS]
-            else
-                node_buffers[i] = Array.new
-                puts "ERROR DETECTED, FOLLOWING LINES SHOULD MATCH:"
-                puts "CACHED_URI: #{cached_ref_uri}"
-                puts "COMPRD_URI: #{$1}"
-            end
-            #end
-        }
-    else
+    if(cached_ref_uri != ref_match)
         puts "writing"
         writeBufferVals(out_file_handle,cached_ref_uri,node_buffers)
-        node_buffers.each { |buf|
-            buf = Array.new
+        (0..node_buffers.size - 1).each { |i|
+            node_buffers[i] = Array.new
         }
-        cached_ref_uri = nil
+        cached_ref_uri = ref_match
     end
+    node_buffers[REF_POS] << ref_line.split(',')[RTT_POS]
+    (1..data_handles.length - 1).each { |i|
+        cpd_line = data_handles[i].gets
+        cpd_line.split(',')[URI_POS].match(/(^http:\/\/[a-zA-Z0-9\.\-]+[a-z0-9][\/]*[a-zA-Z0-9\-\_\.\~\/]*|^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)/)
+        cpd_match = $1
+        if(ref_match == cpd_match)
+            node_buffers[i] << cpd_line.split(',')[RTT_POS]
+        else
+            puts "ERROR DETECTED, FOLLOWING LINES SHOULD MATCH:"
+            puts "CACHED_URI: #{cached_ref_uri}"
+            puts "COMPRD_URI: #{cpd_match}"
+            puts "ref_match: #{ref_match}"
+            puts "cpd_file: #{i}"
+            exit 1
+        end
+    }
 end
 puts "done."
