@@ -41,7 +41,7 @@ def writeBufferVals(file_handle,uri,buffers)
     file_handle.puts
 end
 
-puts "Reading from '#{options[:data_file_path]}'..."
+puts "Reading from '#{options[:data_files]}'..."
 puts "Outputting to '#{options[:out_file_path]}'..."
 puts
 
@@ -54,6 +54,7 @@ out_file_handle = File.open(options[:out_file_path],'w')
 data_files = options[:data_files]
 
 data_files.each do |i|
+    puts "making handle from #{i}..."
     out_file_handle.print "#{i}\t"
     data_handles << File.new(i)
     node_buffers << Array.new
@@ -62,23 +63,29 @@ end
 out_file_handle.puts
 
 print "working..."
+REF_POS = 0
+RTT_POS = 12
+URI_POS = 13
 cached_ref_uri = nil
-while ref_line = data_handles[0].gets
+while ref_line = data_handles[REF_POS].gets
     print "."
     STDOUT.flush
     matched_uri = UNSET
     #validate uri
-    ref_line.split(',')[13].match(/(^http:\/\/[a-zA-Z0-9\.\-]+[a-z0-9][\/]*[a-zA-Z0-9\-\_\.\~\/]*|^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)/)
+    ref_line.split(',')[URI_POS].match(/(^http:\/\/[a-zA-Z0-9\.\-]+[a-z0-9][\/]*[a-zA-Z0-9\-\_\.\~\/]*|^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)/)
+    puts "ref line: #{ref_line}"
+    puts "ref line matched uri: #{$1}"
+    puts "cached_ref_uri is #{cached_ref_uri}"
     if(cached_ref_uri == nil)
         cached_ref_uri = $1
     end
     if(cached_ref_uri == $1)
-        node_buffers[0] << ref_line.split(',')[12]
-        (1..data_handles.length - 1).each_index { |i|
+        node_buffers[REF_POS] << ref_line.split(',')[RTT_POS]
+        (1..data_handles.length - 1).each { |i|
             #while cpd_line = data_handles[i].gets && valid(cpd_line)
-            cpd_line.split(',')[13].match(/(^http:\/\/[a-zA-Z0-9\.\-]+[a-z0-9][\/]*[a-zA-Z0-9\-\_\.\~\/]*|^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)/)
+            cpd_line.split(',')[URI_POS].match(/(^http:\/\/[a-zA-Z0-9\.\-]+[a-z0-9][\/]*[a-zA-Z0-9\-\_\.\~\/]*|^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)/)
             if(cached_ref_uri == $1)
-                node_buffers[i] << cpd_line.split(',')[12]
+                node_buffers[i] << cpd_line.split(',')[RTT_POS]
             else
                 node_buffers[i] = Array.new
                 puts "ERROR DETECTED, FOLLOWING LINES SHOULD MATCH:"
@@ -88,11 +95,12 @@ while ref_line = data_handles[0].gets
             #end
         }
     else
+        puts "writing"
         writeBufferVals(out_file_handle,cached_ref_uri,node_buffers)
         node_buffers.each { |buf|
             buf = Array.new
         }
-        cached_ref_line = nil
+        cached_ref_uri = nil
     end
 end
 puts "done."

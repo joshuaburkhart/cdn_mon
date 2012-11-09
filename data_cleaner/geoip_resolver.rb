@@ -85,7 +85,7 @@ def getGeoIpInfo(geoip,addr)
        lat = city.latitude
        long = city.longitude
     end
-    return "(#{lat},#{long})"
+    return "(#{lat}~#{long})" #was using a ',' but '~' won't change number of commas in csv line
 end
 
 puts "Reading from '#{options[:data_file_path]}'..."
