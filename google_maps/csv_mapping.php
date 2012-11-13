@@ -3,29 +3,34 @@
 This PHP file has a user input a CSV file and takes the geo locations for both the user
 and the CDN locations.
 Outputs: A Google map that output markers (red) for CDN locations and (blue) for 
-user location
+user location.  Labeling each marker with the URI.
 */
+//Check if the user submitted a file
 if(isset($_POST['Submit'])) {
+    //upload the file
 	$link = $_FILES['file']['name'];
 	$file = new SplFileObject($link); 
 	$file->setFlags(SplFileObject::READ_CSV); 
 	$file->setCsvControl(","); 
-	$count = 0;
-	$temp = 0;
-	$lat = array();
-	$long = array();
-	$allUri = array();
+
+	$count = 0;	// number of rows
+	$temp = 0; // temp number of rows
+	$lat = array(); // stores the latitudes 
+	$long = array(); // stores the longitudes
+	$allUri = array(); // stores all the URIs
+	
+	// loop through each row
 	foreach ($file as $row) { 
     	list($name, $ip, $mac,$homeGeo,$URI,$newIP,$unav,$geolocation,$date,
          	$none,$zero,$otherIp,$other,$Uri) = $row; 
     	$temp = $count - 1;
     	$temploc = preg_replace("/[~]/", ",", $geolocation);
     	$temphome = preg_replace("/[~]/", ",", $homeGeo);
+    	// if the location is new post to array
     	if(($count == 0) or ($latlong[$temp] != $temploc)){
         	//echo $latlong[$temp] .$temploc;
-        	$allUri[$count] = "Hello";
-        	
-        	$home = preg_replace("/[~]/", ",", $homeGeo);
+        	$allUri[$count] = $Uri;
+        	$home = preg_replace("/[~]/", ",", $homeGeo); // replace '~' with ','
     		preg_match("/([0-9.-]+).+?([0-9.-]+)/",$home, $matches);
     		$latHomeNum = (float)$matches[1];
     		$longHomeNum = (float)$matches[2];
@@ -39,6 +44,7 @@ if(isset($_POST['Submit'])) {
     		$count++;
     	}
 	} 
+	$js_array = json_encode($allUri); // encode the URI array for javascript
 }
 ?>
 <!DOCTYPE html>
@@ -56,17 +62,15 @@ var mapProp = {
   mapTypeId:google.maps.MapTypeId.ROADMAP
 };
 var map=new google.maps.Map(document.getElementById("googleMap"),mapProp);
+
 var latArray = new Array();
 var longArray = new Array();
-var uriArray = new Array();
 var latHome = 0;
 var longHome = 0;
 var count = 0;
+
 <?php
-/*
-    foreach($allUri as $key => $value) {
-    	echo "uriArray[$key] = $value;\n";
-    } */
+    echo "var uriArray = ". $js_array . ";\n";
     foreach($lat as $key => $value) {
     	echo "latArray[$key] = $value;\n";
     }
@@ -82,7 +86,7 @@ for(var i = 0; i < count; i++) {
     var myLatLng = new google.maps.LatLng(latArray[i],longArray[i]);
 	var marker = new google.maps.Marker({
     	position: myLatLng,
-    	title: "URI: ",
+    	title: "URI: "+uriArray[i],
     	map: map
   	});
   }
@@ -109,7 +113,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 		<input type="file" name="file" id="file" /> 
 		<input type="submit" name="Submit" value="Submit">
 </form>
-<div id="googleMap" style="width:500px;height:380px;"></div>
+<div id="googleMap" style="width:800px;height:600px;"></div>
 
 </body>
 </html>
