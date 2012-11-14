@@ -48,10 +48,13 @@ orig_files = in_handle.gets #on first line
 puts orig_files
 geo_info = in_handle.gets #on second line
 puts geo_info
-geo_ary = geo_info.split
+geo_ary = geo_info.split(',')
 nodes = Array.new
 (0..geo_ary.length - 1).each { |i|
     nodes[i] = Array.new
+puts "TESTING----------"    
+puts geo_ary[i]
+puts "TESTING-----------"
     nodes[i][0] = geo_ary[i]
 }
 
@@ -70,8 +73,14 @@ percentage = 1 - (options[:percentile] / 100.0)
 idx_threshold = percentage * nodes.length
 
 valid_idx = 0
+puts "TESTING------------------"
+puts nodes.inspect
+puts nodes[0].inspect
+puts nodes[0]
+puts nodes[0][0]
+puts "TESTING=--=---------------"
 while valid_idx < idx_threshold
-    out_handle.puts(nodes[valid_idx])
+    out_handle.puts(nodes[valid_idx][0])
     valid_idx += 1
 end
 
