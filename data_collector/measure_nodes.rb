@@ -94,14 +94,25 @@ def findLocalHostname()
 end
 
 def findLocalIp()
-    ip = %x(curl -s http://automation.whatismyip.com/n09230945.asp)
-    return ip.strip
+    ip_out = %x(curl -s http://automation.whatismyip.com/n09230945.asp)
+    if(ip_out.match(/^([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$/))
+        ip = $1
+        return ip.strip
+    else
+        raise "UNRECOGNIZED IP ADDRESS:\n#{ip}"
+    end
 end
 
 def findLocalMac()
-    en_out = %x(ifconfig -a)
-    en_out.match(/ether (\w{2}:\w{2}:\w{2}:\w{2})|HWaddr (\w{2}:\w{2}:\w{2}:\w{2})/)
-    mac = $1
+    en_out = %x(/sbin/ifconfig -a)
+    mac = nil
+    if(en_out.match(/ether (\w{2}:\w{2}:\w{2}:\w{2}:\w{2}:\w{2})/))
+        mac = $1
+    elsif(en_out.match(/HWaddr (\w{2}:\w{2}:\w{2}:\w{2}:\w{2}:\w{2})/))
+        mac = $1
+    else
+        raise "UNRECOGNIZED MAC ADDRESS:\n#{en_out}"
+    end
     return mac.strip
 end
 
@@ -203,8 +214,13 @@ SEC = 1
 MIN = 60 * SEC
 MAX_T = 3 * MIN
 
+local_node_name = UNSET
+local_ip_addr = UNSET
+local_mac_addr = UNSET
+local_geoip_info = UNSET
+
 table = Array.new
-out_file_handle = File.open(options[:out_file_path],'a')
+out_file_handle = File.open(options[:out_file_path],'w')
 
 print "working..."
 uri_file_handle = File.open(uri_filename,'r')
@@ -215,10 +231,40 @@ while (uri = uri_file_handle.gets)
         row = DataRow.new
 
         puts "FILLING CLIENT VALS..."
-        row.local_node_name = findLocalHostname()
-        row.local_ip_addr = findLocalIp()
-        row.local_mac_addr = findLocalMac()
-        row.local_geoip_info = UNSET
+        if(local_node_name == UNSET)
+            local_node_name = findLocalHostname()
+        end
+        row.local_node_name = local_node_name
+        if(local_ip_addr == UNSET)
+            begin
+                Timeout::timeout(MAX_T) {
+                    local_ip_addr = findLocalIp()
+                }
+            rescue
+                puts "\nException Raised: #{$!}"
+                local_ip_addr = ERROR
+            rescue Timeout::Error
+                puts "\nTimeout Error: #{$!}"
+            end
+        end
+        row.local_ip_addr = local_ip_addr
+        if(local_mac_addr == UNSET)
+            begin
+                Timeout::timeout(MAX_T) {
+                    local_mac_addr = findLocalMac()
+                }
+            rescue
+                puts "\nException Raised: #{$!}"
+                local_mac_addr = ERROR
+            rescue Timeout::Error
+                puts "\nTimeout Error: #{$!}"
+            end
+        end
+        row.local_mac_addr = local_mac_addr
+        if(local_geoip_info == UNSET)
+            #TODO: set geoip info here?
+        end
+        row.local_geoip_info = local_geoip_info
 
         puts "FILLING SERVER VALS..."
         begin
