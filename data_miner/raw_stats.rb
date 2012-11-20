@@ -98,16 +98,19 @@ while ref_line = data_handles[REF_POS].gets
         cached_ref_uri = ref_match
     end
     if(FIRST_LINE)
-        out_file_handle.print("#{ref_line.split(',')[GEO_POS]},")  
+        out_file_handle.print("#{ref_line.split(',')[GEO_POS]}")  
     end
     node_buffers[REF_POS] << ref_line.split(',')[RTT_POS]
     (1..data_handles.length - 1).each { |i|
         cpd_line = data_handles[i].gets
+        if(cpd_line.nil?)
+            puts "\nERROR DETECTED IN HANDLE: #{data_handles[i].inspect}"
+        end
         cpd_line.split(',')[URI_POS].match(/(^http:\/\/[a-zA-Z0-9\.\-]+[a-z0-9][\/]*[a-zA-Z0-9\-\_\.\~\/]*|^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$)/)
         cpd_match = $1
         if(ref_match == cpd_match)
             if(FIRST_LINE)
-                out_file_handle.print(cpd_line.split(',')[GEO_POS])
+                out_file_handle.print(",#{cpd_line.split(',')[GEO_POS]}")
             end
             node_buffers[i] << cpd_line.split(',')[RTT_POS]
         else

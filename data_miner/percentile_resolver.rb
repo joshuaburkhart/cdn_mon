@@ -66,6 +66,12 @@ while line = in_handle.gets
     puts "METRICS LIST LENGTH #{metrics_list.size}"
     (1..metrics_list.length - 1).each { |i|
         nidx = i - 1
+        if(nodes.nil?)
+            puts "\nERROR: NODES NIL"
+        elsif(nodes[nidx].nil?)
+            puts "\nERROR: NODES[NIDX] NIL"
+            puts "NODES: #{nodes.inspect}"
+        end
         current = nodes[nidx][1]
         metric = metrics_list[i].strip
         if(metric != ERROR && current != ERROR)
@@ -78,7 +84,7 @@ while line = in_handle.gets
         else
             nodes[nidx][1] = ERROR
         end
-        puts "ADDING TO #{metric} TO NODES[#{nidx}: #{nodes[nidx][0]}"
+        puts "ADDING #{metric} TO NODE[#{nidx}]: #{nodes[nidx][0]}"
     }
 end
 
