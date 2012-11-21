@@ -13,7 +13,7 @@ Example 2: ruby raw_stats.rb -l ../test/out.geoip.csv,../test2/out.geoip.csv -o 
 Output Format:
 <first row has infile names>
 <second row has infile node geo info>
-uri,RTT avg 1,RTT avg 2,RTT avg N
+uri,ACTV_POS avg 1,ACTV_POS avg 2,ACTV_POS avg N
     EOS
     opts.on('-h','--help','Display this screen') {
         puts opts
@@ -27,6 +27,16 @@ uri,RTT avg 1,RTT avg 2,RTT avg N
     opts.on('-o','--out FILE','Output File Path FILE') { |file|
         options[:out_file_path] = file
     }
+    options[:stat_type] = 'r' #avg rtt
+    opts.on('-s','--stat TYPE','Statistic Type TYPE') { |type|
+        if(type == 'ri') #rtt improvement
+            options[:stat_type] = 'ri'
+        elsif(type == 'b') #avg bandwidth
+            options[:stat_type] = 'b'
+        elsif(type == 'bi') #bandwidth improvement
+            options[:stat_type] = 'bi'
+        end
+    }
 }
 
 optparse.parse!
@@ -34,16 +44,52 @@ if (options[:data_files].nil?)
     raise OptionParser::MissingArgument,"URI File Path = #{options[:data_files]}"
 end
 
-def writeBufferVals(file_handle,uri,buffers)
+def writeBufferVals(file_handle,uri,buffers,type)
     file_handle.print "#{uri}"
     buffers.each { |buf|
         if(!buf.include?(ERROR))
-            sum = 0.0
-            buf.each { |e|
-                sum += Float(e)
-            }
-            avg = (sum / buf.size)
-            file_handle.print ",#{avg}"
+            if(type == 'r' || type == 'b')
+                sum = 0.0
+                empty_count = 0
+                buf.each { |e|
+                    if(e != "")
+                        puts "\ne: #{e}"
+                        puts "\nBUF: #{buf.inspect}"
+                        sum += Float(e)
+                    else
+                        empty_count += 1
+                    end
+                }
+                avg = (sum / (buf.size - empty_count))
+                file_handle.print ",#{avg}"
+            elsif(type == 'ri' || type == 'bi')
+                initial = nil
+                following = 0
+                first_idx = 0
+                empty_count = 0
+                buf.each_with_index { |e,i|
+                    if(e != "")
+                        if(i == first_idx)
+                            initial = Float(e)
+                        else
+                            following += Float(e)
+                        end
+                    else
+                        if(initial.nil?)
+                            first_idx += 1
+                        end
+                        empty_count += 1
+                    end
+                }
+                avg_following = (following / ((buf.size - 1) - empty_count))
+                if(!initial.nil? && !avg_following.nil?)
+                    imprv = initial / avg_following
+                    file_handle.print ",#{imprv}"
+                end
+            else
+                puts "\nERROR, UNKNOWN STAT TYPE: #{type}"
+                exit
+            end
         else
             file_handle.print ",#{ERROR}"
         end
@@ -53,6 +99,7 @@ end
 
 puts "Reading from '#{options[:data_files].inspect}'..."
 puts "Outputting to '#{options[:out_file_path]}'..."
+puts "Stat Type '#{options[:stat_type]}'..."
 puts
 
 UNSET="<unavailable>"
@@ -73,9 +120,16 @@ end
 out_file_handle.puts
 
 print "working..."
+ACTV_POS = nil
 REF_POS = 0
 GEO_POS = 3
+BDW_POS = 11
 RTT_POS = 12
+if(options[:stat_type] == 'r' || options[:stat_type] == 'ri')
+    ACTV_POS = RTT_POS
+elsif(options[:stat_type] == 'b' || options[:stat_type] == 'bi')
+    ACTV_POS = BDW_POS
+end
 URI_POS = 13
 CLB = "CACHE_LINE_BOOTSTRAP"
 FIRST_LINE = true
@@ -91,7 +145,7 @@ while ref_line = data_handles[REF_POS].gets
     end
     if(cached_ref_uri != ref_match)
         puts "writing"
-        writeBufferVals(out_file_handle,cached_ref_uri,node_buffers)
+        writeBufferVals(out_file_handle,cached_ref_uri,node_buffers,options[:stat_type])
         (0..node_buffers.size - 1).each { |i|
             node_buffers[i] = Array.new
         }
@@ -100,7 +154,7 @@ while ref_line = data_handles[REF_POS].gets
     if(FIRST_LINE)
         out_file_handle.print("#{ref_line.split(',')[GEO_POS]}")  
     end
-    node_buffers[REF_POS] << ref_line.split(',')[RTT_POS]
+    node_buffers[REF_POS] << ref_line.split(',')[ACTV_POS]
     (1..data_handles.length - 1).each { |i|
         cpd_line = data_handles[i].gets
         if(cpd_line.nil?)
@@ -112,7 +166,7 @@ while ref_line = data_handles[REF_POS].gets
             if(FIRST_LINE)
                 out_file_handle.print(",#{cpd_line.split(',')[GEO_POS]}")
             end
-            node_buffers[i] << cpd_line.split(',')[RTT_POS]
+            node_buffers[i] << cpd_line.split(',')[ACTV_POS]
         else
             puts "ERROR DETECTED, FOLLOWING LINES SHOULD MATCH:"
             puts "CACHED_URI: #{cached_ref_uri}"
