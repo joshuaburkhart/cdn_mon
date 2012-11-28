@@ -31,6 +31,10 @@ geoip N
     opts.on('-o','--out FILE','Output File Path FILE'){ |file|
         options[:outfile] = file
     }
+    options[:reverse] = false
+    opts.on('-r','--reverse','Reverse specified percentile to upper threshold'){
+        options[:reverse] = true
+    }
 }
 optparse.parse!
 if(options[:infile].nil?)
@@ -40,30 +44,32 @@ end
 puts "Percentile:  #{options[:percentile]}"
 puts "Input File:  #{options[:infile]}"
 puts "Output File: #{options[:outfile]}"
+puts "Reverse Order: #{options[:reverse]}"
 
 ERROR = "<error>"
+NAN = "NaN"
 out_handle = File.open(options[:outfile],'w')
 in_handle = File.new(options[:infile])
 puts
 orig_files = in_handle.gets #on first line
-puts "ORIGINAL: #{orig_files}"
+#puts "ORIGINAL: #{orig_files}"
 geo_info = in_handle.gets #on second line
-puts "GEO INFO: #{geo_info}"
+#puts "GEO INFO: #{geo_info}"
 geo_ary = geo_info.split(',')
 nodes = Array.new
 (0..geo_ary.length - 1).each { |i|
     nodes[i] = Array.new
-    puts "NODE #{i} HAS GEO INFO: #{geo_ary[i]}"
+    #puts "NODE #{i} HAS GEO INFO: #{geo_ary[i]}"
     nodes[i][0] = geo_ary[i].to_s.strip
-    puts "ADDING TO NODES>>> NOW: #{nodes.inspect}"
+    #puts "ADDING TO NODES>>> NOW: #{nodes.inspect}"
 }
 
 while line = in_handle.gets
     metrics_list = line.split(',')
-    puts "METRICS LIST 0: #{metrics_list[0]}"
-    puts "METRICS LIST 1: #{metrics_list[1]}"
-    puts "METRICS LIST 2: #{metrics_list[2]}"
-    puts "METRICS LIST LENGTH #{metrics_list.size}"
+    #puts "METRICS LIST 0: #{metrics_list[0]}"
+    #puts "METRICS LIST 1: #{metrics_list[1]}"
+    #puts "METRICS LIST 2: #{metrics_list[2]}"
+    #puts "METRICS LIST LENGTH #{metrics_list.size}"
     (1..metrics_list.length - 1).each { |i|
         nidx = i - 1
         if(nodes.nil?)
@@ -74,23 +80,34 @@ while line = in_handle.gets
         end
         current = nodes[nidx][1]
         metric = metrics_list[i].strip
-        if(metric != ERROR && current != ERROR)
+        if(metric != ERROR && metric != NAN)
             metric = Float(metric)
-            if(!current.nil?)
+            if(!current.nil? && current != ERROR)
                 nodes[nidx][1] = (current + metric)
             else
                 nodes[nidx][1] = metric
             end
-        else
+        elsif(current == ERROR)
             nodes[nidx][1] = ERROR
+        else
+            #leave nodes[nidx][1] unmodified
         end
-        puts "ADDING #{metric} TO NODE[#{nidx}]: #{nodes[nidx][0]}"
+        #puts "ADDING #{metric} TO NODE[#{nidx}]: #{nodes[nidx][0]}"
     }
 end
 
-nodes.sort! { |i,j|
-    i[1] <=> j[1]
-}
+if(options[:reverse] == true)
+    puts "SORTING IN REVERSE (LARGE -> SMALL)"
+    nodes.sort! { |i,j|
+        j[1] <=> i[1]
+    }
+else
+    puts "SORTING NORMAL (SMALL -> LARGE)"
+    nodes.sort! { |i,j|
+        i[1] <=> j[1]
+    }
+end
+puts nodes.inspect
 
 percentage = 1 - (options[:percentile] / 100.0)
 idx_threshold = percentage * nodes.length
