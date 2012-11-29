@@ -1,0 +1,28 @@
+#cat imprv_rtts.csv | grep -v '<error>' > imprv_rtts_cleaned.csv
+irc = read.csv("imprv_rtts_cleaned.csv",skip=2)
+
+#plot web resource stats
+plot(log="y",xlab="Web Resource",ylab="Improvement",main="Mean Improvement Factor",pty="s",col="darkgreen",rowMeans(irc[,2:length(irc)],na.rm=TRUE))
+abline(h=1,col="red",lty="solid",lwd=3)
+abline(h=mean(rowMeans(irc[,2:length(irc)],na.rm=TRUE),na.rm=TRUE),col="black",lty="solid",lwd=3)
+axis(4,at=mean(rowMeans(irc[,2:length(irc)],na.rm=TRUE),na.rm=TRUE),labels=paste("Avg = ",mean(rowMeans(irc[,2:length(irc)],na.rm=TRUE),na.rm=TRUE)," units",sep=""))
+grid()
+
+#plot node stats
+plot(log="y",xlab="PlanetLab Node",ylab="Improvement",main="Mean Improvement Factor",pty="s",col="darkgreen",colMeans(irc[,2:length(irc)],na.rm=TRUE))
+abline(h=1,col="red",lty="solid",lwd=3)
+abline(h=mean(rowMeans(irc[,2:length(irc)],na.rm=TRUE),na.rm=TRUE),col="black",lty="solid",lwd=3)
+axis(4,at=mean(rowMeans(irc[,2:length(irc)],na.rm=TRUE),na.rm=TRUE),labels=paste("Avg = ",mean(rowMeans(irc[,2:length(irc)],na.rm=TRUE),na.rm=TRUE)," units",sep=""))
+grid()
+
+#plot suspicious resources
+irc = read.csv("imprv_bandwidths_cleaned.csv",skip=2)
+plot(xlim=c(20,65),ylim=c(.6,1.2),log="y",xlab="Web Resource",ylab="Bandwidth Improvement",main="Mean Bandwidth Improvement Factor",pty="s",col="darkgreen",rowMeans(irc[,2:length(irc)],na.rm=TRUE))
+abline(v=23,col="blue")
+abline(v=62,col="blue")
+axis(3,at=23,labels=23)
+axis(3,at=62,labels=62)
+abline(h=mean(rowMeans(irc[23:62,2:length(irc)],na.rm=TRUE),na.rm=TRUE),col="black",lty="solid",lwd=3)
+axis(4,at=mean(rowMeans(irc[23:62,2:length(irc)],na.rm=TRUE),na.rm=TRUE),labels=paste("Avg of Suspicious Cluster = ",mean(rowMeans(irc[23:62,2:length(irc)],na.rm=TRUE),na.rm=TRUE),sep=""))
+grid()
+
